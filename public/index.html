@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHCSA Terminal Lab</title>
+
+<!-- xterm.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/addon-fit.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/addon-web-links.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=IBM+Plex+Sans+Arabic:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #e3b341;
+  --orange: #f0883e;
+  --purple: #bc8cff;
+  --text: #c9d1d9;
+  --muted: #8b949e;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'IBM Plex Sans Arabic', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+
+/* ─── SPLASH ─── */
+#splash {
+  position: fixed; inset: 0; z-index: 100;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.5rem; padding: 2rem; text-align: center;
+  transition: opacity 0.4s ease;
+}
+#splash.hidden { opacity: 0; pointer-events: none; }
+
+.splash-logo {
+  font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 700;
+  background: linear-gradient(135deg, #fff, var(--accent) 50%, var(--green));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.splash-sub { color: var(--muted); font-size: 1rem; max-width: 480px; line-height: 1.6; }
+
+.splash-features {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem; max-width: 480px; width: 100%;
+}
+.feat {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.85rem 1rem; display: flex; align-items: center; gap: 0.6rem;
+  font-size: 0.85rem; text-align: right;
+}
+.feat .icon { font-size: 1.4rem; flex-shrink: 0; }
+
+.btn-start {
+  background: linear-gradient(135deg, var(--accent), var(--green));
+  color: #000; border: none; padding: 0.9rem 3rem;
+  border-radius: 12px; font-size: 1.1rem; font-weight: 700;
+  cursor: pointer; font-family: var(--sans); transition: all 0.2s;
+}
+.btn-start:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(88,166,255,0.4); }
+
+/* ─── MAIN LAYOUT ─── */
+#app {
+  display: flex; flex-direction: column; height: 100vh;
+  opacity: 0; transition: opacity 0.4s ease;
+}
+#app.visible { opacity: 1; }
+
+/* ─── TOP BAR ─── */
+.topbar {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1rem; flex-shrink: 0; min-height: 48px; flex-wrap: wrap;
+}
+.topbar-brand { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); white-space: nowrap; }
+
+.task-selector {
+  display: flex; gap: 0.4rem; flex: 1; overflow-x: auto; padding: 0.2rem 0;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.task-btn {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); padding: 0.3rem 0.75rem; cursor: pointer;
+  font-family: var(--sans); font-size: 0.75rem; white-space: nowrap;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.task-btn:hover { border-color: var(--accent); color: var(--accent); }
+.task-btn.active { background: rgba(88,166,255,0.1); border-color: var(--accent); color: var(--accent); }
+.task-btn.done { background: rgba(63,185,80,0.1); border-color: var(--green); color: var(--green); }
+.task-btn.done.active { background: rgba(63,185,80,0.2); }
+
+.conn-badge {
+  font-family: var(--mono); font-size: 0.7rem; padding: 0.2rem 0.6rem;
+  border-radius: 4px; border: 1px solid; white-space: nowrap; flex-shrink: 0;
+}
+.conn-badge.connecting { color: var(--yellow); border-color: var(--yellow); }
+.conn-badge.connected { color: var(--green); border-color: var(--green); }
+.conn-badge.disconnected { color: var(--red); border-color: var(--red); }
+
+/* ─── BODY ─── */
+.body {
+  display: flex; flex: 1; overflow: hidden;
+}
+
+/* ─── SIDEBAR (task info) ─── */
+.sidebar {
+  width: 300px; min-width: 260px; max-width: 340px;
+  background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+  flex-shrink: 0;
+}
+.sidebar-header {
+  background: var(--surface2); border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.3rem;
+}
+.sidebar-task-title { font-size: 0.92rem; font-weight: 700; }
+.sidebar-meta { display: flex; gap: 0.5rem; }
+.tag {
+  font-family: var(--mono); font-size: 0.65rem; padding: 0.15rem 0.5rem;
+  border-radius: 3px; border: 1px solid;
+}
+.tag.cat { color: var(--accent); border-color: rgba(88,166,255,0.3); background: rgba(88,166,255,0.07); }
+.tag.srv { color: var(--orange); border-color: rgba(240,136,62,0.3); background: rgba(240,136,62,0.07); }
+
+.sidebar-body { flex: 1; overflow-y: auto; padding: 0.9rem; display: flex; flex-direction: column; gap: 1rem; }
+.sidebar-body::-webkit-scrollbar { width: 4px; }
+.sidebar-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.section-label {
+  font-size: 0.65rem; font-family: var(--mono); color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem;
+}
+
+.objective-box {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.9rem; font-size: 0.82rem; line-height: 1.7;
+}
+.objective-box ul { padding-right: 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.objective-box code {
+  background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 3px;
+  padding: 0.05rem 0.3rem; font-family: var(--mono); font-size: 0.75rem; color: var(--green);
+}
+
+/* Hints */
+.hint-item {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; overflow: hidden;
+}
+.hint-btn {
+  width: 100%; padding: 0.55rem 0.8rem; background: none; border: none;
+  color: var(--muted); text-align: right; cursor: pointer; font-family: var(--sans);
+  font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center;
+  transition: color 0.15s;
+}
+.hint-btn:hover { color: var(--text); }
+.hint-body {
+  display: none; padding: 0.7rem 0.8rem; font-size: 0.8rem; line-height: 1.6;
+  border-top: 1px solid var(--border);
+}
+.hint-body.open { display: block; }
+.hint-body p { margin-bottom: 0.4rem; color: var(--muted); }
+.hint-code {
+  background: #070d14; border: 1px solid var(--border); border-radius: 5px;
+  padding: 0.6rem 0.8rem; font-family: var(--mono); font-size: 0.75rem;
+  color: var(--yellow); white-space: pre-wrap; direction: ltr; text-align: left;
+  margin-top: 0.4rem; cursor: pointer; transition: border-color 0.15s;
+}
+.hint-code:hover { border-color: var(--accent); }
+.hint-code::after { content: ' 📋'; opacity: 0.5; font-style: normal; }
+
+/* Completion */
+.complete-box {
+  background: rgba(63,185,80,0.07); border: 1px solid rgba(63,185,80,0.3);
+  border-radius: 8px; padding: 0.9rem; display: none; flex-direction: column; gap: 0.6rem;
+}
+.complete-box.show { display: flex; }
+.complete-title { color: var(--green); font-weight: 700; font-size: 0.92rem; }
+.complete-msg { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+.btn-next {
+  background: var(--green); color: #000; border: none;
+  padding: 0.5rem 1rem; border-radius: 7px; font-family: var(--sans);
+  font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+}
+.btn-next:hover { filter: brightness(1.1); }
+
+/* ─── TERMINAL PANEL ─── */
+.terminal-panel {
+  flex: 1; display: flex; flex-direction: column; background: #000; min-width: 0;
+}
+
+.term-topbar {
+  background: #1a1a1a; border-bottom: 1px solid #333;
+  padding: 0.4rem 1rem; display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; }
+.dot.r { background: #ff5f57; }
+.dot.y { background: #ffbd2e; }
+.dot.g { background: #28ca41; }
+.term-title { font-family: var(--mono); font-size: 0.72rem; color: #666; margin: 0 auto; }
+
+#terminal-container {
+  flex: 1; overflow: hidden; padding: 4px;
+}
+
+/* ─── MOBILE ─── */
+@media (max-width: 700px) {
+  .sidebar { display: none; }
+  .sidebar.mobile-show {
+    display: flex; position: fixed; inset: 0; z-index: 50;
+    width: 100%; max-width: 100%; border: none;
+  }
+  .mobile-task-btn {
+    display: flex !important;
+  }
+}
+.mobile-task-btn {
+  display: none; background: none; border: 1px solid var(--border); color: var(--muted);
+  padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.75rem;
+}
+
+/* ─── RECONNECT OVERLAY ─── */
+#reconnect-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+  flex-direction: column; gap: 1rem; text-align: center; padding: 2rem;
+}
+#reconnect-overlay.show { display: flex; }
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-logo">🖥️ RHCSA Terminal Lab</div>
+  <p class="splash-sub">
+    Terminal Linux حقيقي في المتصفح — تدرّب على مهام RHCSA الحقيقية<br>
+    مع تلميحات تدريجية وتحقق فوري
+  </p>
+  <div class="splash-features">
+    <div class="feat"><span class="icon">⚡</span><span>Terminal Linux حقيقي</span></div>
+    <div class="feat"><span class="icon">📋</span><span>20 مهمة RHCSA</span></div>
+    <div class="feat"><span class="icon">💡</span><span>تلميحات تدريجية</span></div>
+    <div class="feat"><span class="icon">✅</span><span>تحقق فوري</span></div>
+  </div>
+  <button class="btn-start" onclick="startLab()">🚀 ابدأ الـ Lab</button>
+</div>
+
+<!-- RECONNECT -->
+<div id="reconnect-overlay">
+  <div style="font-size:2rem">🔌</div>
+  <div style="font-size:1.1rem;font-weight:700">انقطع الاتصال بالخادم</div>
+  <div style="color:var(--muted);font-size:0.9rem">جاري إعادة الاتصال...</div>
+  <button class="btn-start" style="margin-top:0.5rem" onclick="location.reload()">إعادة تحميل الصفحة</button>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">⚡ RHCSA LAB</div>
+    <div class="task-selector" id="task-selector"></div>
+    <button class="mobile-task-btn" onclick="toggleSidebar()">📋 المهمة</button>
+    <div class="conn-badge connecting" id="conn-badge">● جاري الاتصال</div>
+  </div>
+
+  <div class="body">
+    <!-- Terminal -->
+    <div class="terminal-panel">
+      <div class="term-topbar">
+        <div class="dot r" onclick="location.reload()"></div>
+        <div class="dot y"></div>
+        <div class="dot g"></div>
+        <div class="term-title" id="term-title">bash — rhcsa-lab</div>
+      </div>
+      <div id="terminal-container"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-task-title" id="sb-title">اختر مهمة</div>
+        <div class="sidebar-meta">
+          <span class="tag cat" id="sb-cat"></span>
+          <span class="tag srv" id="sb-srv"></span>
+        </div>
+      </div>
+      <div class="sidebar-body">
+        <div>
+          <div class="section-label">📋 المطلوب</div>
+          <div class="objective-box" id="sb-objective">اختر مهمة من الأعلى للبدء</div>
+        </div>
+        <div id="hints-section">
+          <div class="section-label">💡 تلميحات</div>
+          <div id="hints-container"></div>
+        </div>
+        <div class="complete-box" id="complete-box">
+          <div class="complete-title">✅ أحسنت! المهمة مكتملة</div>
+          <div class="complete-msg" id="complete-msg"></div>
+          <button class="btn-next" id="btn-next" onclick="goNextTask()">المهمة التالية ←</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// TASKS DATA
+// ════════════════════════════════════════════════
+const TASKS = [
+  {
+    id:'net', server:'serverb', cat:'Network', title:'تكوين الشبكة',
+    objective:`<ul>
+      <li>IP: <code>172.25.250.11/24</code></li>
+      <li>Gateway: <code>172.25.250.254</code></li>
+      <li>DNS: <code>172.25.250.254</code></li>
+      <li>Hostname: <code>serverb.lab.example.com</code></li>
+    </ul>`,
+    hints:[
+      { label:'🔍 عرض الاتصالات', code:'nmcli con show' },
+      { label:'⚙️ تعيين الإعدادات', code:'nmcli con mod "System eth0" ipv4.addresses 172.25.250.11/24 ipv4.gateway 172.25.250.254 ipv4.dns 172.25.250.254 ipv4.method manual' },
+      { label:'✅ تطبيق وـ Hostname', code:'nmcli con up "System eth0"\nhostnamectl set-hostname serverb.lab.example.com' },
+    ],
+    validate: ()=> checkFile('/tmp/lab-hostname','serverb') || checkCmd('hostnamectl set-hostname'),
+    success:'nmcli + hostnamectl هما الأداتان الرسميتان في RHEL 9 لإدارة الشبكة والـ hostname.',
+  },
+  {
+    id:'repo', server:'serverb', cat:'Repository', title:'إنشاء Repository',
+    objective:`<ul>
+      <li>ملف: <code>/etc/yum.repos.d/rhel9.repo</code></li>
+      <li>AppStream + BaseOS من classroom.example.com</li>
+      <li>تعطيل GPG: <code>gpgcheck=0</code></li>
+    </ul>`,
+    hints:[
+      { label:'📝 إنشاء الملف', code:`cat > /etc/yum.repos.d/rhel9.repo << 'EOF'\n[AppStream]\nname=AppStream\nbaseurl=http://classroom.example.com/content/rhel9.0/x86_64/dvd/AppStream\nenabled=1\ngpgcheck=0\n\n[BaseOS]\nname=BaseOS\nbaseurl=http://classroom.example.com/content/rhel9.0/x86_64/dvd/BaseOS\nenabled=1\ngpgcheck=0\nEOF` },
+      { label:'✅ التحقق', code:'dnf repolist' },
+    ],
+    success:'gpgcheck=0 ضروري في بيئة الاختبار. تحقق دائماً بـ dnf repolist.',
+  },
+  {
+    id:'selinux', server:'serverb', cat:'SELinux', title:'إصلاح SELinux — المنفذ 82',
+    objective:`<ul>
+      <li>اسمح لـ SELinux بالمنفذ <code>82/tcp</code></li>
+      <li>عدّل httpd.conf ليستمع على <code>82</code></li>
+      <li>افتح المنفذ في Firewall</li>
+      <li>شغّل وفعّل httpd</li>
+    </ul>`,
+    hints:[
+      { label:'🔒 SELinux أولاً', code:'semanage port -a -t http_port_t -p tcp 82\nsemanage port -l | grep http' },
+      { label:'⚙️ httpd.conf', code:"sed -i 's/^Listen 80/Listen 82/' /etc/httpd/conf/httpd.conf" },
+      { label:'🔥 Firewall + Service', code:'firewall-cmd --permanent --add-port=82/tcp\nfirewall-cmd --reload\nsystemctl enable --now httpd' },
+    ],
+    success:'لا تعطّل SELinux أبداً! الترتيب: semanage → httpd.conf → firewall → systemctl',
+  },
+  {
+    id:'users', server:'serverb', cat:'Users & Groups', title:'المستخدمون والمجموعات',
+    objective:`<ul>
+      <li>مجموعة: <code>admin</code></li>
+      <li>harry, natasha → أعضاء ثانويون في <code>admin</code></li>
+      <li>sarah → بدون shell تفاعلي (<code>/sbin/nologin</code>)</li>
+      <li>كلمة مرور الجميع: <code>password</code></li>
+    </ul>`,
+    hints:[
+      { label:'👥 إنشاء المجموعة', code:'groupadd admin' },
+      { label:'👤 المستخدمون', code:'useradd -G admin harry\nuseradd -G admin natasha\nuseradd -s /sbin/nologin sarah' },
+      { label:'🔑 كلمات المرور', code:"echo 'password' | passwd --stdin harry\necho 'password' | passwd --stdin natasha\necho 'password' | passwd --stdin sarah" },
+    ],
+    success:'-G للمجموعة الثانوية، -g للرئيسية. -s /sbin/nologin يمنع الدخول التفاعلي.',
+  },
+  {
+    id:'collab', server:'serverb', cat:'Permissions', title:'مجلد مشترك /common/admin',
+    objective:`<ul>
+      <li>إنشاء <code>/common/admin</code></li>
+      <li>المالك: مجموعة <code>admin</code></li>
+      <li>صلاحيات: <code>2770</code> (SGID + rwx لـ admin فقط)</li>
+    </ul>`,
+    hints:[
+      { label:'📁 إنشاء وتغيير المجموعة', code:'mkdir -p /common/admin\nchgrp admin /common/admin' },
+      { label:'🔐 SGID + صلاحيات', code:'chmod 2770 /common/admin\nls -ld /common/admin' },
+    ],
+    success:'2 في 2770 = SGID. الملفات الجديدة ترث مجموعة admin تلقائياً.',
+  },
+  {
+    id:'autofs', server:'serverb', cat:'AutoFS', title:'تكوين AutoFS',
+    objective:`<ul>
+      <li>ثبّت <code>autofs</code></li>
+      <li>أضف لـ <code>/etc/auto.master</code>: <code>/localhome /etc/auto.localhome</code></li>
+      <li>أنشئ <code>/etc/auto.localhome</code> للمستخدم production5</li>
+      <li>المصدر: <code>servera.lab.example.com:/user-homes/production5</code></li>
+    </ul>`,
+    hints:[
+      { label:'📦 التثبيت', code:'dnf install -y autofs' },
+      { label:'📝 auto.master', code:'echo "/localhome  /etc/auto.localhome" >> /etc/auto.master' },
+      { label:'📝 auto.localhome + تشغيل', code:'echo "production5  -rw,sync  servera.lab.example.com:/user-homes/production5" > /etc/auto.localhome\nsystemctl enable --now autofs' },
+    ],
+    success:'auto.master = الخريطة الرئيسية. auto.localhome = تفاصيل كل مستخدم.',
+  },
+  {
+    id:'cron', server:'serverb', cat:'Cron', title:'Cron Job لـ harry',
+    objective:`<ul>
+      <li>المستخدم: <code>harry</code></li>
+      <li>كل يوم الساعة <code>12:30</code></li>
+      <li>الأمر: <code>/bin/echo "hello"</code></li>
+    </ul>`,
+    hints:[
+      { label:'📅 تنسيق crontab', code:'# دقيقة ساعة يوم-شهر شهر يوم-أسبوع أمر\n# 30 12 * * * /bin/echo "hello"' },
+      { label:'✏️ تعديل + تحقق', code:'crontab -u harry -e\ncrontab -u harry -l' },
+    ],
+    success:'30 12 = الساعة 12:30. * * * = كل يوم، كل شهر، كل يوم أسبوع.',
+  },
+  {
+    id:'ntp', server:'serverb', cat:'NTP', title:'تكوين NTP Client',
+    objective:`<ul>
+      <li>الخادم: <code>classroom.example.com</code></li>
+      <li>أضفه لـ <code>/etc/chrony.conf</code></li>
+      <li>شغّل وفعّل <code>chronyd</code></li>
+    </ul>`,
+    hints:[
+      { label:'📝 إضافة الخادم', code:'echo "server classroom.example.com iburst" >> /etc/chrony.conf\ncat /etc/chrony.conf | grep server' },
+      { label:'🔄 تشغيل + تحقق', code:'systemctl enable --now chronyd\nchronyc sources -v' },
+    ],
+    success:'RHEL 9 يستخدم chrony. iburst = مزامنة سريعة عند البداية.',
+  },
+  {
+    id:'find', server:'serverb', cat:'Find', title:'البحث عن ملفات sarah',
+    objective:`<ul>
+      <li>ابحث عن ملفات المستخدم <code>sarah</code></li>
+      <li>انسخها إلى <code>/root/find.user/</code></li>
+    </ul>`,
+    hints:[
+      { label:'📁 إنشاء المجلد', code:'mkdir -p /root/find.user' },
+      { label:'🔍 البحث والنسخ', code:'find / -user sarah -exec cp {} /root/find.user/ \\; 2>/dev/null\nls /root/find.user' },
+    ],
+    success:'find + -exec cp هو الحل الكلاسيكي. 2>/dev/null يخفي أخطاء المجلدات المحمية.',
+  },
+  {
+    id:'grep', server:'serverb', cat:'Text', title:'grep في /etc/passwd',
+    objective:`<ul>
+      <li>ابحث عن كلمة <code>home</code> في <code>/etc/passwd</code></li>
+      <li>احفظ النتيجة في <code>/root/search.txt</code></li>
+    </ul>`,
+    hints:[
+      { label:'💡 الأمر المباشر', code:'grep "home" /etc/passwd > /root/search.txt\ncat /root/search.txt' },
+    ],
+    success:'grep + > لحفظ النتيجة. > يستبدل الملف، >> يضيف إليه.',
+  },
+  {
+    id:'useradd', server:'serverb', cat:'Users', title:'مستخدم بـ UID محدد',
+    objective:`<ul>
+      <li>اسم: <code>alies</code></li>
+      <li>UID: <code>1326</code></li>
+    </ul>`,
+    hints:[
+      { label:'💡 الأمر', code:'useradd -u 1326 alies\nid alies' },
+    ],
+    success:'-u (صغير) لتحديد UID. -U (كبير) لإنشاء مجموعة بنفس الاسم.',
+  },
+  {
+    id:'tar', server:'serverb', cat:'Archive', title:'إنشاء ملف tar.gz',
+    objective:`<ul>
+      <li>المصدر: <code>/var/tmp</code></li>
+      <li>الهدف: <code>/root/test.tar.gz</code></li>
+    </ul>`,
+    hints:[
+      { label:'💡 الأمر', code:'tar -czf /root/test.tar.gz /var/tmp\ntar -tzf /root/test.tar.gz | head -5' },
+    ],
+    success:'c=create, z=gzip, f=filename. الملف الناتج يأتي مباشرة بعد f.',
+  },
+  {
+    id:'container', server:'serverb', cat:'Containers', title:'بناء Container Image',
+    objective:`<ul>
+      <li>سجّل دخولك: <code>utility.lab.example.com</code></li>
+      <li>user: <code>admin</code> / pass: <code>redhat</code></li>
+      <li>ابنِ image اسمها <code>monitor</code></li>
+    </ul>`,
+    hints:[
+      { label:'🔑 تسجيل الدخول', code:'podman login utility.lab.example.com -u admin -p redhat' },
+      { label:'🏗️ البناء', code:'podman build -t monitor http://classroom.example.com/Containerfile\npodman images' },
+    ],
+    success:'RHEL 9 = podman (rootless). docker لا يوجد في الامتحان.',
+  },
+  {
+    id:'container-svc', server:'serverb', cat:'Containers', title:'Container كـ Systemd Service',
+    objective:`<ul>
+      <li>container: <code>ascii2pdf</code> من image <code>monitor</code></li>
+      <li><code>/opt/files</code> → <code>/opt/incoming</code></li>
+      <li><code>/opt/processed</code> → <code>/opt/outgoing</code></li>
+      <li>خدمة: <code>container-ascii2pdf</code></li>
+    </ul>`,
+    hints:[
+      { label:'📁 المجلدات', code:'mkdir -p /opt/files /opt/processed' },
+      { label:'🐳 تشغيل الـ Container', code:'podman run -d --name ascii2pdf \\\n  -v /opt/files:/opt/incoming:Z \\\n  -v /opt/processed:/opt/outgoing:Z \\\n  monitor' },
+      { label:'⚙️ الخدمة', code:'mkdir -p ~/.config/systemd/user\ncd ~/.config/systemd/user\npodman generate systemd --name ascii2pdf --files --new\nloginctl enable-linger student\nsystemctl --user daemon-reload\nsystemctl --user enable --now container-ascii2pdf' },
+    ],
+    success:'loginctl enable-linger = الخدمة تعمل بعد logout. بدونها تتوقف.',
+  },
+  {
+    id:'umask', server:'serverb', cat:'Permissions', title:'umask للمستخدمة natasha',
+    objective:`<ul>
+      <li>ملفات جديدة: <code>r--------</code> (400)</li>
+      <li>مجلدات جديدة: <code>r-x------</code> (500)</li>
+      <li>دائم في كل الجلسات</li>
+    </ul>`,
+    hints:[
+      { label:'🧮 الحساب', code:'# 666 - 400 = 266 → umask 0266\numask' },
+      { label:'✅ التطبيق', code:'echo "umask 0266" >> /home/natasha/.bashrc\ngrep umask /home/natasha/.bashrc' },
+    ],
+    success:'umask 0266: ملفات=400، مجلدات=500. أضفه في .bashrc للديمومة.',
+  },
+  {
+    id:'passexp', server:'serverb', cat:'Security', title:'انتهاء كلمة المرور',
+    objective:`<ul>
+      <li>كلمات المرور تنتهي بعد <code>20</code> يوماً</li>
+      <li>للمستخدمين الجدد فقط</li>
+      <li>الملف: <code>/etc/login.defs</code></li>
+    </ul>`,
+    hints:[
+      { label:'📝 تعديل PASS_MAX_DAYS', code:"sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS   20/' /etc/login.defs\ngrep PASS_MAX_DAYS /etc/login.defs" },
+    ],
+    success:'/etc/login.defs للمستخدمين الجدد. chage -M 20 username للمستخدمين الحاليين.',
+  },
+  {
+    id:'sudo', server:'serverb', cat:'Sudo', title:'Sudo بدون كلمة مرور',
+    objective:`<ul>
+      <li>مجموعة <code>admin</code> → sudo بدون كلمة مرور</li>
+      <li>ملف: <code>/etc/sudoers.d/admin</code></li>
+    </ul>`,
+    hints:[
+      { label:'✏️ إنشاء ملف sudoers', code:'echo "%admin ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/admin\nchmod 440 /etc/sudoers.d/admin\nvisudo -c' },
+    ],
+    success:'% = مجموعة. chmod 440 ضروري. visudo -c للتحقق من صحة الصياغة.',
+  },
+  {
+    id:'lvm', server:'servera', cat:'LVM', title:'إنشاء Logical Volume',
+    objective:`<ul>
+      <li>Extent size: <code>8MiB</code></li>
+      <li>VG: <code>datastore</code></li>
+      <li>LV: <code>database</code> — <code>50 extents</code></li>
+      <li>Filesystem: <code>ext3</code></li>
+      <li>Mount: <code>/mnt/database</code></li>
+    </ul>`,
+    hints:[
+      { label:'💾 PV + VG', code:'pvcreate /dev/sdc\nvgcreate -s 8MiB datastore /dev/sdc' },
+      { label:'📦 LV + Format', code:'lvcreate -l 50 -n database datastore\nmkfs.ext3 /dev/datastore/database' },
+      { label:'🔗 Mount دائم', code:"mkdir -p /mnt/database\necho '/dev/datastore/database /mnt/database ext3 defaults 0 0' >> /etc/fstab\nmount -a\ndf -h /mnt/database" },
+    ],
+    success:'الترتيب: pvcreate → vgcreate(-s 8MiB) → lvcreate(-l 50) → mkfs.ext3 → fstab → mount',
+  },
+  {
+    id:'lvresize', server:'servera', cat:'LVM', title:'توسيع Logical Volume',
+    objective:`<ul>
+      <li>وسّع <code>database</code> LV إلى <code>100 extents</code></li>
+      <li>وسّع الـ filesystem أيضاً</li>
+    </ul>`,
+    hints:[
+      { label:'📏 lvextend', code:'lvextend -l 100 /dev/datastore/database' },
+      { label:'💾 resize2fs', code:'umount /mnt/database\nresize2fs /dev/datastore/database\nmount -a\ndf -h /mnt/database' },
+    ],
+    success:'ext3: umount أولاً ثم resize2fs. xfs: xfs_growfs (لا يحتاج umount).',
+  },
+  {
+    id:'tuned', server:'servera', cat:'Tuned', title:'Tuned Profile',
+    objective:`<ul>
+      <li>ثبّت وشغّل <code>tuned</code></li>
+      <li>احصل على التوصية واطبّقها</li>
+    </ul>`,
+    hints:[
+      { label:'📦 التثبيت', code:'dnf install -y tuned\nsystemctl enable --now tuned' },
+      { label:'🎯 التوصية والتطبيق', code:'tuned-adm recommend\ntuned-adm profile virtual-guest\ntuned-adm active' },
+    ],
+    success:'tuned-adm recommend يقترح أفضل profile. tuned-adm active للتحقق.',
+  },
+];
+
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let term = null;
+let fitAddon = null;
+let ws = null;
+let currentTaskIdx = 0;
+const taskDone = {};
+TASKS.forEach(t => taskDone[t.id] = false);
+let wsReconnectTimer = null;
+
+// ════════════════════════════════════════════════
+// SPLASH → START
+// ════════════════════════════════════════════════
+function startLab() {
+  document.getElementById('splash').classList.add('hidden');
+  const app = document.getElementById('app');
+  app.classList.add('visible');
+  setTimeout(() => {
+    initTerminal();
+    buildTaskSelector();
+    loadTask(0);
+    connectWS();
+  }, 100);
+}
+
+// ════════════════════════════════════════════════
+// TERMINAL INIT
+// ════════════════════════════════════════════════
+function initTerminal() {
+  term = new Terminal({
+    fontFamily: '"JetBrains Mono", "Cascadia Code", "Fira Code", monospace',
+    fontSize: 14,
+    lineHeight: 1.4,
+    theme: {
+      background: '#000000',
+      foreground: '#c9d1d9',
+      cursor: '#58a6ff',
+      cursorAccent: '#000',
+      black: '#0d1117', red: '#f85149', green: '#3fb950',
+      yellow: '#e3b341', blue: '#58a6ff', magenta: '#bc8cff',
+      cyan: '#39c5cf', white: '#c9d1d9',
+      brightBlack: '#6e7681', brightRed: '#f85149', brightGreen: '#3fb950',
+      brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
+      brightCyan: '#56d364', brightWhite: '#ffffff',
+    },
+    cursorStyle: 'bar',
+    cursorBlink: true,
+    scrollback: 5000,
+    allowProposedApi: true,
+  });
+
+  fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.loadAddon(new WebLinksAddon.WebLinksAddon());
+
+  const container = document.getElementById('terminal-container');
+  term.open(container);
+  fitAddon.fit();
+
+  window.addEventListener('resize', () => {
+    fitAddon.fit();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  });
+
+  term.onData(data => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'input', data }));
+    }
+  });
+}
+
+// ════════════════════════════════════════════════
+// WEBSOCKET
+// ════════════════════════════════════════════════
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${proto}//${location.host}`;
+
+  setBadge('connecting', '● جاري الاتصال');
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    setBadge('connected', '● متصل');
+    document.getElementById('reconnect-overlay').classList.remove('show');
+    if (term) {
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'output' && term) {
+        term.write(msg.data);
+      } else if (msg.type === 'error') {
+        if (term) term.writeln(`\x1b[31m${msg.data}\x1b[0m`);
+      }
+    } catch {}
+  };
+
+  ws.onclose = () => {
+    setBadge('disconnected', '● منقطع');
+    document.getElementById('reconnect-overlay').classList.add('show');
+    wsReconnectTimer = setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+
+  // Keepalive
+  setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'ping' }));
+    }
+  }, 25000);
+}
+
+function setBadge(cls, text) {
+  const b = document.getElementById('conn-badge');
+  b.className = `conn-badge ${cls}`;
+  b.textContent = text;
+}
+
+// ════════════════════════════════════════════════
+// TASK SELECTOR
+// ════════════════════════════════════════════════
+function buildTaskSelector() {
+  const sel = document.getElementById('task-selector');
+  sel.innerHTML = '';
+  TASKS.forEach((t, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'task-btn' + (taskDone[t.id] ? ' done' : '') + (i===0?' active':'');
+    btn.id = `tbtn-${t.id}`;
+    btn.textContent = `${taskDone[t.id]?'✅':'⬜'} ${t.title}`;
+    btn.onclick = () => loadTask(i);
+    sel.appendChild(btn);
+  });
+}
+
+function updateTaskBtn(id) {
+  const btn = document.getElementById(`tbtn-${id}`);
+  if (!btn) return;
+  const t = TASKS.find(x=>x.id===id);
+  btn.className = 'task-btn' + (taskDone[id]?' done':'') + (TASKS[currentTaskIdx].id===id?' active':'');
+  btn.textContent = `${taskDone[id]?'✅':'⬜'} ${t.title}`;
+}
+
+// ════════════════════════════════════════════════
+// LOAD TASK INTO SIDEBAR
+// ════════════════════════════════════════════════
+function loadTask(idx) {
+  // Update selector
+  document.querySelectorAll('.task-btn').forEach(b => b.classList.remove('active'));
+  const newBtn = document.getElementById(`tbtn-${TASKS[idx].id}`);
+  if (newBtn) newBtn.classList.add('active');
+
+  currentTaskIdx = idx;
+  const t = TASKS[idx];
+
+  document.getElementById('sb-title').textContent = t.title;
+  document.getElementById('sb-cat').textContent = t.cat;
+  document.getElementById('sb-srv').textContent = t.server;
+  document.getElementById('sb-objective').innerHTML = t.objective;
+  document.getElementById('term-title').textContent = `bash — ${t.server}.lab.example.com`;
+
+  // Hints
+  const hc = document.getElementById('hints-container');
+  hc.innerHTML = '';
+  t.hints.forEach((h, i) => {
+    const div = document.createElement('div');
+    div.className = 'hint-item';
+    const codeId = `hcode-${idx}-${i}`;
+    div.innerHTML = `
+      <button class="hint-btn" onclick="toggleHint(this)">
+        <span>${h.label}</span><span>▸</span>
+      </button>
+      <div class="hint-body">
+        ${h.text ? `<p>${h.text}</p>` : ''}
+        <div class="hint-code" id="${codeId}" onclick="pasteToTerminal('${codeId}')" title="اضغط لنسخ الأمر للـ Terminal">${h.code}</div>
+      </div>`;
+    hc.appendChild(div);
+  });
+
+  // Complete box
+  const cb = document.getElementById('complete-box');
+  if (taskDone[t.id]) {
+    cb.classList.add('show');
+    document.getElementById('complete-msg').textContent = t.success;
+  } else {
+    cb.classList.remove('show');
+  }
+
+  // Next task button
+  const nb = document.getElementById('btn-next');
+  if (idx < TASKS.length - 1) {
+    nb.style.display = '';
+    nb.textContent = `التالي: ${TASKS[idx+1].title} ←`;
+  } else {
+    nb.style.display = 'none';
+  }
+
+  // Print task prompt in terminal
+  if (term) {
+    term.writeln('');
+    term.writeln(`\x1b[1;36m╔══ المهمة ${idx+1}/${TASKS.length}: ${t.title} ══\x1b[0m`);
+    term.writeln(`\x1b[90m📋 راجع المطلوب في اللوحة اليمنى | اكتب الأوامر هنا\x1b[0m`);
+    term.writeln('');
+  }
+}
+
+function toggleHint(btn) {
+  const body = btn.nextElementSibling;
+  const arrow = btn.querySelector('span:last-child');
+  const open = body.classList.toggle('open');
+  arrow.textContent = open ? '▾' : '▸';
+}
+
+function pasteToTerminal(codeId) {
+  const el = document.getElementById(codeId);
+  if (!el || !term || !ws || ws.readyState !== WebSocket.OPEN) return;
+  const code = el.textContent.trim();
+  // Type the command into the terminal (first line only for safety)
+  const firstLine = code.split('\n')[0];
+  ws.send(JSON.stringify({ type: 'input', data: firstLine }));
+  term.focus();
+}
+
+function goNextTask() {
+  if (currentTaskIdx < TASKS.length - 1) loadTask(currentTaskIdx + 1);
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('mobile-show');
+}
+
+// ════════════════════════════════════════════════
+// TASK COMPLETION (watch terminal output)
+// ════════════════════════════════════════════════
+// We use a simple output watcher to mark tasks done
+// based on success indicators in terminal output
+const successPatterns = {
+  net:         [/hostnamectl set-hostname.*serverb/i, /hostname set to/i],
+  repo:        [/dnf repolist/i, /AppStream.*BaseOS/i],
+  selinux:     [/systemctl.*httpd/i, /httpd.*started/i, /semanage port.*82/i],
+  users:       [/passwd.*sarah/i, /useradd.*sarah/i],
+  collab:      [/chmod 2770/i, /chgrp admin/i],
+  autofs:      [/systemctl.*autofs/i, /autofs.*started/i],
+  cron:        [/crontab.*harry/i, /30 12/],
+  ntp:         [/systemctl.*chronyd/i, /chronyc sources/i],
+  find:        [/find.*-user sarah/i],
+  grep:        [/grep.*home.*passwd/i, /search\.txt/i],
+  useradd:     [/useradd.*1326.*alies/i, /id alies/i],
+  tar:         [/tar.*czf.*test\.tar\.gz/i],
+  container:   [/podman build.*monitor/i, /podman images/i],
+  'container-svc': [/systemctl.*enable.*container-ascii2pdf/i, /loginctl.*enable-linger/i],
+  umask:       [/umask 0266/i, /umask.*bashrc/i],
+  passexp:     [/PASS_MAX_DAYS.*20/i, /login\.defs/i],
+  sudo:        [/sudoers\.d\/admin/i, /%admin.*NOPASSWD/i],
+  lvm:         [/mount -a/i, /lvcreate.*database/i],
+  lvresize:    [/resize2fs/i, /lvextend.*100/i],
+  tuned:       [/tuned-adm profile/i, /tuned-adm active/i],
+};
+
+let termBuffer = '';
+const orig_ws_onmessage_ref = null;
+
+function watchOutput(data) {
+  termBuffer += data;
+  if (termBuffer.length > 2000) termBuffer = termBuffer.slice(-2000);
+
+  const task = TASKS[currentTaskIdx];
+  if (taskDone[task.id]) return;
+
+  const patterns = successPatterns[task.id] || [];
+  const matched = patterns.some(p => p.test(termBuffer));
+  if (matched) {
+    markTaskDone(task.id);
+  }
+}
+
+function markTaskDone(id) {
+  if (taskDone[id]) return;
+  taskDone[id] = true;
+  const idx = TASKS.findIndex(t => t.id === id);
+
+  // Update sidebar
+  document.getElementById('complete-box').classList.add('show');
+  document.getElementById('complete-msg').textContent = TASKS[idx].success;
+
+  // Update button
+  updateTaskBtn(id);
+
+  // Print success in terminal
+  if (term) {
+    term.writeln('');
+    term.writeln('\x1b[1;32m╔═══════════════════════════════════╗\x1b[0m');
+    term.writeln('\x1b[1;32m║  ✅ ممتاز! المهمة مكتملة!         ║\x1b[0m');
+    term.writeln('\x1b[1;32m╚═══════════════════════════════════╝\x1b[0m');
+    term.writeln('');
+  }
+}
+
+// Patch WS to intercept output for watching
+const _origConnectWS = connectWS;
+// Override message handler after connection
+function patchWSWatch() {
+  if (!ws) return;
+  const origOnMsg = ws.onmessage;
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'output') {
+        watchOutput(msg.data);
+        if (term) term.write(msg.data);
+        return;
+      }
+      if (msg.type === 'error') {
+        if (term) term.writeln(`\x1b[31m${msg.data}\x1b[0m`);
+        return;
+      }
+    } catch {}
+  };
+}
+
+// Override connectWS to patch after connect
+const origConnectWS = connectWS;
+window.connectWS = function() {
+  origConnectWS();
+  // Patch after short delay
+  setTimeout(patchWSWatch, 100);
+};
+// Re-call for initial connection
+setTimeout(patchWSWatch, 500);
+</script>
+</body>
+</html>
