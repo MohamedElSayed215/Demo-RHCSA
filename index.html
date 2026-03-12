@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="ar" >
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHCSA Lab Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════
+   DESIGN SYSTEM
+══════════════════════════════════════════ */
+:root {
+  --bg:       #080c12;
+  --s1:       #0d1320;
+  --s2:       #111827;
+  --s3:       #1a2235;
+  --border:   #1e2d45;
+  --border2:  #243450;
+  --cyan:     #00d4ff;
+  --green:    #00ff88;
+  --orange:   #ff6b35;
+  --red:      #ff4757;
+  --yellow:   #ffd32a;
+  --purple:   #a78bfa;
+  --text:     #dde6f0;
+  --muted:    #4a6080;
+  --muted2:   #6b82a0;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Inter', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%; background: var(--bg);
+  color: var(--text); font-family: var(--sans);
+  overflow: hidden;
+}
+
+/* ── scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ══════════════════════════════════════════
+   SPLASH
+══════════════════════════════════════════ */
+#splash {
+  position: fixed; inset: 0; z-index: 999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 1.8rem; padding: 2rem; text-align: center;
+  transition: opacity .5s ease, transform .5s ease;
+}
+#splash.out { opacity: 0; transform: scale(1.03); pointer-events: none; }
+
+.splash-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 40% at 30% 40%, rgba(0,212,255,.07) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 30% at 70% 60%, rgba(0,255,136,.05) 0%, transparent 70%);
+}
+
+.logo {
+  display: flex; align-items: center; gap: .75rem;
+  font-family: var(--mono); font-size: .75rem;
+  color: var(--cyan); letter-spacing: .15em;
+  border: 1px solid rgba(0,212,255,.25);
+  background: rgba(0,212,255,.05);
+  border-radius: 999px; padding: .4rem 1.2rem;
+  animation: logoPulse 2.5s ease infinite;
+}
+@keyframes logoPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,212,255,.2); }
+  50%      { box-shadow: 0 0 0 8px rgba(0,212,255,0); }
+}
+
+.splash-title {
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  font-weight: 900; line-height: 1.1;
+  background: linear-gradient(135deg, #fff 0%, var(--cyan) 45%, var(--green) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.splash-sub {
+  color: var(--muted2); font-size: 1rem;
+  line-height: 1.7; max-width: 500px;
+}
+
+.features-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: .75rem; max-width: 500px; width: 100%;
+}
+.feature {
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 12px; padding: .9rem 1rem;
+  display: flex; align-items: center; gap: .75rem;
+  font-size: .85rem; text-align: right;
+  transition: border-color .2s;
+}
+.feature:hover { border-color: var(--border2); }
+.feature .fi { font-size: 1.5rem; flex-shrink: 0; }
+
+.btn-launch {
+  background: linear-gradient(135deg, var(--cyan), var(--green));
+  color: #000; font-family: var(--sans); font-weight: 700;
+  font-size: 1.1rem; border: none; border-radius: 14px;
+  padding: 1rem 3.5rem; cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  position: relative; overflow: hidden;
+}
+.btn-launch::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,.25));
+}
+.btn-launch:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(0,212,255,.4);
+}
+
+/* ══════════════════════════════════════════
+   MAIN LAYOUT
+══════════════════════════════════════════ */
+#app {
+  display: flex; flex-direction: column;
+  height: 100vh; opacity: 0; transition: opacity .4s;
+}
+#app.show { opacity: 1; }
+
+/* ── TOP BAR ── */
+.topbar {
+  display: flex; align-items: center; gap: .6rem;
+  background: var(--s1); border-bottom: 1px solid var(--border);
+  padding: .55rem 1rem; flex-shrink: 0;
+  min-height: 50px;
+}
+
+.brand {
+  font-family: var(--mono); font-size: .75rem;
+  color: var(--cyan); letter-spacing: .1em;
+  white-space: nowrap; margin-left: .5rem;
+}
+
+.tasks-scroll {
+  display: flex; gap: .4rem; flex: 1;
+  overflow-x: auto; padding: .1rem 0;
+  scrollbar-width: none;
+}
+.tasks-scroll::-webkit-scrollbar { display: none; }
+
+.tb {
+  flex-shrink: 0;
+  background: var(--s3); border: 1px solid var(--border);
+  border-radius: 7px; color: var(--muted2);
+  padding: .3rem .8rem; cursor: pointer;
+  font-family: var(--sans); font-size: .73rem; font-weight: 600;
+  white-space: nowrap; transition: all .15s;
+  display: flex; align-items: center; gap: .35rem;
+}
+.tb:hover { border-color: var(--border2); color: var(--text); }
+.tb.active { background: rgba(0,212,255,.08); border-color: var(--cyan); color: var(--cyan); }
+.tb.done   { background: rgba(0,255,136,.07); border-color: rgba(0,255,136,.4); color: var(--green); }
+.tb.done.active { background: rgba(0,255,136,.12); }
+
+.progress-pill {
+  flex-shrink: 0; display: flex; align-items: center; gap: .5rem;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 8px; padding: .3rem .8rem;
+  font-family: var(--mono); font-size: .72rem; color: var(--muted2);
+}
+.pill-bar { width: 80px; height: 5px; background: var(--s3); border-radius: 99px; overflow: hidden; }
+.pill-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--green)); border-radius: 99px; transition: width .4s ease; }
+
+/* ── BODY ── */
+.body { display: flex; flex: 1; overflow: hidden; }
+
+/* ══════════════════════════════════════════
+   TASK PANEL (right in RTL)
+══════════════════════════════════════════ */
+.task-panel {
+  width: 310px; flex-shrink: 0;
+  background: var(--s1); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+.tp-header {
+  background: var(--s2); border-bottom: 1px solid var(--border);
+  padding: .85rem 1rem;
+}
+.tp-num { font-family: var(--mono); font-size: .65rem; color: var(--muted); margin-bottom: .3rem; }
+.tp-title { font-size: .95rem; font-weight: 700; margin-bottom: .4rem; }
+.tp-tags { display: flex; gap: .4rem; }
+.tag {
+  font-family: var(--mono); font-size: .62rem;
+  padding: .15rem .5rem; border-radius: 4px; border: 1px solid;
+}
+.tag-cat { color: var(--cyan); border-color: rgba(0,212,255,.3); background: rgba(0,212,255,.06); }
+.tag-srv { color: var(--orange); border-color: rgba(255,107,53,.3); background: rgba(255,107,53,.06); }
+
+.tp-body { flex: 1; overflow-y: auto; padding: .9rem; display: flex; flex-direction: column; gap: .9rem; }
+
+.sec-lbl {
+  font-family: var(--mono); font-size: .62rem;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .1em;
+  margin-bottom: .35rem;
+}
+
+.obj-box {
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 8px; padding: .85rem; font-size: .82rem; line-height: 1.75;
+}
+.obj-box ul { padding-right: 1rem; display: flex; flex-direction: column; gap: .3rem; }
+.obj-box code {
+  background: rgba(0,0,0,.4); border: 1px solid var(--border);
+  border-radius: 3px; padding: .05rem .35rem;
+  font-family: var(--mono); font-size: .75rem; color: var(--green);
+}
+
+/* Hints */
+.hint {
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+}
+.hint-hd {
+  width: 100%; padding: .55rem .85rem;
+  background: none; border: none; color: var(--muted2);
+  text-align: right; cursor: pointer; font-family: var(--sans);
+  font-size: .8rem; font-weight: 600;
+  display: flex; justify-content: space-between; align-items: center;
+  transition: color .15s;
+}
+.hint-hd:hover { color: var(--text); }
+.hint-bd {
+  display: none; padding: .7rem .85rem;
+  border-top: 1px solid var(--border); font-size: .8rem;
+}
+.hint-bd.open { display: block; }
+.hint-desc { color: var(--muted2); margin-bottom: .4rem; line-height: 1.5; }
+.hint-code {
+  background: #040810; border: 1px solid var(--border2);
+  border-radius: 6px; padding: .65rem .85rem;
+  font-family: var(--mono); font-size: .75rem;
+  color: var(--yellow); white-space: pre; overflow-x: auto;
+  direction: ltr; text-align: left; cursor: pointer;
+  transition: border-color .2s, box-shadow .2s;
+  position: relative;
+}
+.hint-code:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px rgba(0,212,255,.2);
+}
+.hint-code::before {
+  content: '⎘ copy';
+  position: absolute; top: .3rem; left: .4rem;
+  font-size: .6rem; color: var(--muted); font-family: var(--sans);
+  opacity: 0; transition: opacity .15s;
+}
+.hint-code:hover::before { opacity: 1; }
+
+/* Success box */
+.success-box {
+  background: rgba(0,255,136,.05); border: 1px solid rgba(0,255,136,.25);
+  border-radius: 8px; padding: .85rem;
+  display: none; flex-direction: column; gap: .6rem;
+}
+.success-box.show { display: flex; animation: popIn .3s ease; }
+@keyframes popIn { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.suc-title { color: var(--green); font-weight: 700; font-size: .9rem; }
+.suc-msg { color: var(--muted2); font-size: .8rem; line-height: 1.6; }
+.btn-next {
+  background: var(--green); color: #000; border: none;
+  padding: .5rem 1rem; border-radius: 7px;
+  font-family: var(--sans); font-size: .82rem; font-weight: 700;
+  cursor: pointer; align-self: flex-start; transition: filter .15s;
+}
+.btn-next:hover { filter: brightness(1.1); }
+
+/* ══════════════════════════════════════════
+   TERMINAL (left in RTL = fills remaining)
+══════════════════════════════════════════ */
+.term-wrap {
+  flex: 1; display: flex; flex-direction: column;
+  background: #020608; min-width: 0;
+}
+
+.term-bar {
+  background: #0f1419; border-bottom: 1px solid #1a2030;
+  padding: .45rem 1rem; display: flex; align-items: center; gap: .6rem;
+  flex-shrink: 0;
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot.r { background: #ff5f57; } .dot.y { background: #ffbd2e; } .dot.g { background: #28ca41; }
+.term-lbl { font-family: var(--mono); font-size: .7rem; color: #444; margin: 0 auto; }
+.term-badge {
+  font-family: var(--mono); font-size: .65rem; padding: .15rem .5rem;
+  border-radius: 3px; border: 1px solid rgba(0,255,136,.3);
+  color: var(--green); background: rgba(0,255,136,.06);
+}
+
+/* Terminal output */
+.term-out {
+  flex: 1; overflow-y: auto; padding: .85rem 1.2rem;
+  font-family: var(--mono); font-size: .83rem;
+  line-height: 1.65; color: #c8d3e0;
+}
+.term-out::-webkit-scrollbar { width: 4px; }
+.term-out::-webkit-scrollbar-thumb { background: #1a2535; }
+
+.line { direction: ltr; text-align: left; white-space: pre-wrap; word-break: break-all; min-height: 1em; }
+.line.prompt { color: #58b0ff; }
+.line.ok     { color: #00ff88; }
+.line.err    { color: #ff4757; }
+.line.warn   { color: #ffd32a; }
+.line.sys    { color: #a78bfa; }
+.line.dim    { color: #354555; }
+.line.cmd    { color: #dde6f0; }
+.line.file   { color: #39c5cf; }
+
+/* Input row */
+.term-in-row {
+  border-top: 1px solid #0f1a28;
+  background: #020608;
+  padding: .65rem 1.2rem; display: flex; align-items: center;
+  gap: .5rem; direction: ltr; flex-shrink: 0;
+}
+.prompt-str { font-family: var(--mono); font-size: .83rem; color: #58b0ff; white-space: nowrap; user-select: none; }
+.term-input {
+  flex: 1; background: none; border: none; outline: none;
+  font-family: var(--mono); font-size: .83rem; color: #dde6f0;
+  caret-color: var(--cyan);
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .task-panel { display: none; }
+  .task-panel.mob { display: flex; position: fixed; inset: 0; z-index: 50; width: 100%; max-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════ SPLASH ══════ -->
+<div id="splash">
+  <div class="splash-glow"></div>
+  <div class="logo">⚡ RHCSA · PORTAL · v3.0</div>
+  <h1 class="splash-title">Terminal Lab<br>RHCSA 9</h1>
+  <p class="splash-sub">Pick a task → type real commands → get instant feedback<br>No server needed — runs directly in your browser</p>
+  <div class="features-grid">
+    <div class="feature"><span class="fi">🖥️</span><span>Real interactive terminal</span></div>
+    <div class="feature"><span class="fi">📋</span><span>All 20 RHCSA tasks</span></div>
+    <div class="feature"><span class="fi">💡</span><span>Hints &amp; quick copy</span></div>
+    <div class="feature"><span class="fi">✅</span><span>Instant verification</span></div>
+  </div>
+  <button class="btn-launch" onclick="launch()">🚀 Start the Lab</button>
+</div>
+
+<!-- ══════ APP ══════ -->
+<div id="app">
+  <div class="topbar">
+    <div class="brand">⚡ RHCSA LAB</div>
+    <div class="tasks-scroll" id="tasks-scroll"></div>
+    <div class="progress-pill">
+      <div class="pill-bar"><div class="pill-fill" id="pill-fill" style="width:0%"></div></div>
+      <span id="pill-txt">0/20</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- Terminal -->
+    <div class="term-wrap">
+      <div class="term-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="term-lbl" id="term-lbl">bash — rhcsa-lab</div>
+        <div class="term-badge">SIMULATED</div>
+      </div>
+      <div class="term-out" id="tout"></div>
+      <div class="term-in-row">
+        <span class="prompt-str" id="pstr">[root@rhcsa ~]#</span>
+        <input class="term-input" id="tinput" autocomplete="off" spellcheck="false"
+               placeholder="type a command..." onkeydown="onKey(event)">
+      </div>
+    </div>
+
+    <!-- Task panel -->
+    <div class="task-panel" id="tpanel">
+      <div class="tp-header">
+        <div class="tp-num" id="tp-num">Task 1 / 20</div>
+        <div class="tp-title" id="tp-title">—</div>
+        <div class="tp-tags">
+          <span class="tag tag-cat" id="tp-cat"></span>
+          <span class="tag tag-srv" id="tp-srv"></span>
+        </div>
+      </div>
+      <div class="tp-body">
+        <div>
+          <div class="sec-lbl">📋 Objective</div>
+          <div class="obj-box" id="tp-obj">Select a task to begin</div>
+        </div>
+        <div>
+          <div class="sec-lbl">💡 Hints</div>
+          <div id="hints-wrap"></div>
+        </div>
+        <div class="success-box" id="suc-box">
+          <div class="suc-title">✅ Task Complete!</div>
+          <div class="suc-msg" id="suc-msg"></div>
+          <button class="btn-next" id="btn-next" onclick="nextTask()">Next Task →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════
+   TASKS
+════════════════════════════════════════════ */
+const T = [
+  { id:'net', srv:'serverb', cat:'Network', title:'Configure Network',
+    obj:`<ul><li>IP address: <code>172.25.250.11/24</code></li><li>Gateway: <code>172.25.250.254</code></li><li>DNS: <code>172.25.250.254</code></li><li>Hostname: <code>serverb.lab.example.com</code></li></ul>`,
+    hints:[
+      { lbl:'🔍 Show connections', code:'nmcli con show' },
+      { lbl:'⚙️ Set IP / Gateway / DNS', code:'nmcli con mod "System eth0" ipv4.addresses 172.25.250.11/24 \\\n  ipv4.gateway 172.25.250.254 \\\n  ipv4.dns 172.25.250.254 \\\n  ipv4.method manual' },
+      { lbl:'✅ Apply + set hostname', code:'nmcli con up "System eth0"\nhostnamectl set-hostname serverb.lab.example.com' },
+    ],
+    checks:[/nmcli con mod.*172\.25\.250\.11/,/hostnamectl set-hostname.*serverb/],
+    tip:'nmcli is the standard tool in RHEL 9. ipv4.method manual = static IP. Always run con up to apply.' },
+
+  { id:'repo', srv:'serverb', cat:'Repository', title:'Configure YUM Repository',
+    obj:`<ul><li>ملف: <code>/etc/yum.repos.d/rhel9.repo</code></li><li>AppStream + BaseOS</li><li><code>gpgcheck=0</code></li></ul>`,
+    hints:[
+      { lbl:'📝 Create the repo file', code:"cat > /etc/yum.repos.d/rhel9.repo << 'EOF'\n[AppStream]\nname=AppStream\nbaseurl=http://classroom.example.com/content/rhel9.0/x86_64/dvd/AppStream\nenabled=1\ngpgcheck=0\n\n[BaseOS]\nname=BaseOS\nbaseurl=http://classroom.example.com/content/rhel9.0/x86_64/dvd/BaseOS\nenabled=1\ngpgcheck=0\nEOF" },
+      { lbl:'✅ verify', code:'dnf repolist' },
+    ],
+    checks:[/cat.*yum\.repos\.d.*rhel9/,/gpgcheck=0/,/dnf repolist/],
+    tip:'gpgcheck=0 is required in exam environments where no GPG key is present.' },
+
+  { id:'sel', srv:'serverb', cat:'SELinux', title:'SELinux — Port 82',
+    obj:`<ul><li>اسمح لـ SELinux بـ <code>tcp/82</code></li><li>httpd.conf: Listen على <code>82</code></li><li>Firewall + تشغيل httpd</li></ul>`,
+    hints:[
+      { lbl:'🔒 Add SELinux port', code:'semanage port -a -t http_port_t -p tcp 82\nsemanage port -l | grep http' },
+      { lbl:'⚙️ Update httpd.conf', code:"sed -i 's/^Listen 80/Listen 82/' /etc/httpd/conf/httpd.conf" },
+      { lbl:'🔥 Firewall + enable service', code:'firewall-cmd --permanent --add-port=82/tcp\nfirewall-cmd --reload\nsystemctl enable --now httpd' },
+    ],
+    checks:[/semanage port.*82/,/firewall-cmd.*82/,/systemctl.*httpd/],
+    tip:'لا تعطّل SELinux أبداً! الترتيب: semanage → httpd.conf → firewall → systemctl' },
+
+  { id:'usr', srv:'serverb', cat:'Users & Groups', title:'Users and Groups',
+    obj:`<ul><li>Create group: <code>admin</code></li><li>harry, natasha → secondary members of admin</li><li>sarah → shell: <code>/sbin/nologin</code></li><li>Password for all: <code>password</code></li></ul>`,
+    hints:[
+      { lbl:'👥 Create group', code:'groupadd admin' },
+      { lbl:'👤 Create users', code:'useradd -G admin harry\nuseradd -G admin natasha\nuseradd -s /sbin/nologin sarah' },
+      { lbl:'🔑 Set passwords', code:"echo 'password' | passwd --stdin harry\necho 'password' | passwd --stdin natasha\necho 'password' | passwd --stdin sarah" },
+    ],
+    checks:[/groupadd admin/,/useradd.*admin.*harry|useradd.*harry.*admin/,/useradd.*nologin.*sarah|useradd.*sarah.*nologin/],
+    tip:'-G sets secondary group. /sbin/nologin prevents interactive login but allows system use.' },
+
+  { id:'dir', srv:'serverb', cat:'Permissions', title:'Collaborative Directory',
+    obj:`<ul><li>إنشاء <code>/common/admin</code></li><li>Group owner: <code>admin</code></li><li>Permissions: <code>2770</code> (SGID)</li></ul>`,
+    hints:[
+      { lbl:'📁 Create and set group', code:'mkdir -p /common/admin\nchgrp admin /common/admin' },
+      { lbl:'🔐 Set SGID + permissions', code:'chmod 2770 /common/admin\nls -ld /common/admin' },
+    ],
+    checks:[/mkdir.*\/common\/admin/,/chgrp admin/,/chmod 2770/],
+    tip:'The 2 in 2770 = SGID bit: new files inherit the admin group automatically.' },
+
+  { id:'autofs', srv:'serverb', cat:'AutoFS', title:'Configure AutoFS',
+    obj:`<ul><li>Install <code>autofs</code></li><li>Mount point: <code>/localhome</code></li><li>production5 → servera:/user-homes/production5</li></ul>`,
+    hints:[
+      { lbl:'📦 Install', code:'dnf install -y autofs' },
+      { lbl:'📝 Edit auto.master', code:'echo "/localhome  /etc/auto.localhome" >> /etc/auto.master' },
+      { lbl:'📝 Create auto.localhome + start', code:'echo "production5  -rw,sync  servera.lab.example.com:/user-homes/production5" > /etc/auto.localhome\nsystemctl enable --now autofs' },
+    ],
+    checks:[/dnf.*autofs/,/echo.*\/localhome.*auto\.master/,/systemctl.*autofs/],
+    tip:'auto.master defines the mount point. auto.localhome defines the NFS path per user.' },
+
+  { id:'cron', srv:'serverb', cat:'Cron', title:'Cron Job for harry',
+    obj:`<ul><li>User: <code>harry</code></li><li>Every day at <code>12:30</code></li><li>Command: <code>/bin/echo "hello"</code></li></ul>`,
+    hints:[
+      { lbl:'📅 Cron format', code:'# دقيقة ساعة يوم-شهر شهر يوم-أسبوع أمر\n30 12 * * * /bin/echo "hello"' },
+      { lbl:'✏️ Edit crontab', code:'crontab -u harry -e\n# أضف السطر: 30 12 * * * /bin/echo "hello"' },
+      { lbl:'✅ verify', code:'crontab -u harry -l' },
+    ],
+    checks:[/crontab.*-u harry/,/30 12.*echo/],
+    tip:'30 = minute, 12 = hour. * = every day/month/weekday. crontab -u harry -e to edit.' },
+
+  { id:'ntp', srv:'serverb', cat:'NTP', title:'NTP Client',
+    obj:`<ul><li>NTP server: <code>classroom.example.com</code></li><li>File: <code>/etc/chrony.conf</code></li><li>Enable and start <code>chronyd</code></li></ul>`,
+    hints:[
+      { lbl:'📝 Add server', code:'echo "server classroom.example.com iburst" >> /etc/chrony.conf' },
+      { lbl:'🔄 Start + verify', code:'systemctl enable --now chronyd\nchronyc sources -v' },
+    ],
+    checks:[/echo.*classroom.*chrony/,/systemctl.*chronyd/],
+    tip:'chrony replaces ntpd in RHEL 9. iburst = fast initial sync. Always enable --now.' },
+
+  { id:'find', srv:'serverb', cat:'Find', title:"Find sarah's Files",
+    obj:`<ul><li>Find all files owned by <code>sarah</code></li><li>Copy them to <code>/root/find.user/</code></li></ul>`,
+    hints:[
+      { lbl:'📁 Create target dir', code:'mkdir -p /root/find.user' },
+      { lbl:'🔍 Find and copy', code:'find / -user sarah -exec cp {} /root/find.user/ \\; 2>/dev/null\nls /root/find.user' },
+    ],
+    checks:[/mkdir.*find\.user/,/find.*-user sarah.*cp/],
+    tip:'find -exec cp {} /target/ \\; runs cp for every match. 2>/dev/null suppresses permission errors.' },
+
+  { id:'grep', srv:'serverb', cat:'Text', title:'grep and Redirect',
+    obj:`<ul><li>Search for <code>home</code> في <code>/etc/passwd</code></li><li>Save results to <code>/root/search.txt</code></li></ul>`,
+    hints:[
+      { lbl:'💡 One-liner', code:'grep "home" /etc/passwd > /root/search.txt\ncat /root/search.txt' },
+    ],
+    checks:[/grep.*home.*\/etc\/passwd.*search\.txt/],
+    tip:'> redirects output to a file (overwrites). >> appends. Always verify with cat.' },
+
+  { id:'uid', srv:'serverb', cat:'Users', title:'User with Specific UID',
+    obj:`<ul><li>Username: <code>alies</code></li><li>UID: <code>1326</code></li></ul>`,
+    hints:[{ lbl:'💡 Command', code:'useradd -u 1326 alies\nid alies' }],
+    checks:[/useradd.*-u 1326.*alies|useradd.*alies.*-u 1326/],
+    tip:'-u (صغير) لتحديد UID. verify دائماً بـ id username.' },
+
+  { id:'tar', srv:'serverb', cat:'Archive', title:'Archive /var/tmp',
+    obj:`<ul><li>Source: <code>/var/tmp</code></li><li>Target: <code>/root/test.tar.gz</code></li></ul>`,
+    hints:[{ lbl:'💡 Command', code:'tar -czf /root/test.tar.gz /var/tmp\ntar -tzf /root/test.tar.gz | head' }],
+    checks:[/tar -czf \/root\/test\.tar\.gz \/var\/tmp/],
+    tip:'c=create, z=gzip, f=filename. The output file comes right after -f.' },
+
+  { id:'ctr', srv:'serverb', cat:'Containers', title:'Build Container Image',
+    obj:`<ul><li>Registry: <code>utility.lab.example.com</code> (admin/redhat)</li><li>Build image tagged: <code>monitor</code></li><li>Do not modify the Containerfile</li></ul>`,
+    hints:[
+      { lbl:'🔑 Login to registry', code:'podman login utility.lab.example.com -u admin -p redhat' },
+      { lbl:'🏗️ Build image', code:'podman build -t monitor http://classroom.example.com/Containerfile\npodman images' },
+    ],
+    checks:[/podman login.*utility/,/podman build.*monitor/],
+    tip:'RHEL 9 uses podman, not docker. Always login before pulling from private registries.' },
+
+  { id:'ctrsvc', srv:'serverb', cat:'Containers', title:'Container as Systemd Service',
+    obj:`<ul><li>Container: <code>ascii2pdf</code> من <code>monitor</code></li><li>/opt/files → /opt/incoming</li><li>/opt/processed → /opt/outgoing</li><li>خدمة: <code>container-ascii2pdf</code></li></ul>`,
+    hints:[
+      { lbl:'🐳 Run container', code:'podman run -d --name ascii2pdf \\\n  -v /opt/files:/opt/incoming:Z \\\n  -v /opt/processed:/opt/outgoing:Z \\\n  monitor' },
+      { lbl:'⚙️ Generate systemd unit', code:'mkdir -p ~/.config/systemd/user\ncd ~/.config/systemd/user\npodman generate systemd --name ascii2pdf --files --new' },
+      { lbl:'✅ Enable linger + start', code:'loginctl enable-linger student\nsystemctl --user daemon-reload\nsystemctl --user enable --now container-ascii2pdf' },
+    ],
+    checks:[/podman run.*ascii2pdf/,/podman generate systemd/,/loginctl enable-linger/],
+    tip:'loginctl enable-linger keeps the service running after logout. Without it, the container stops.' },
+
+  { id:'umask', srv:'serverb', cat:'Permissions', title:'Set umask for natasha',
+    obj:`<ul><li>New files: <code>r--------</code> (400)</li><li>New dirs: <code>r-x------</code> (500)</li><li>Make it permanent in .bashrc</li></ul>`,
+    hints:[
+      { lbl:'🧮 Calculate umask', code:'# 666 - 400 = 266 → umask 0266\numask' },
+      { lbl:'✅ Apply permanently', code:'echo "umask 0266" >> /home/natasha/.bashrc\ngrep umask /home/natasha/.bashrc' },
+    ],
+    checks:[/echo.*umask 0266.*natasha|umask 0266/],
+    tip:'umask 0266: files=400, dirs=500. Add to .bashrc for persistence across sessions.' },
+
+  { id:'pass', srv:'serverb', cat:'Security', title:'Password Expiry Policy',
+    obj:`<ul><li>New users: password expires in <code>20</code> يوماً للمستخدمين الجدد</li><li>File: <code>/etc/login.defs</code></li></ul>`,
+    hints:[{ lbl:'📝 Edit login.defs', code:"sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS   20/' /etc/login.defs\ngrep PASS_MAX_DAYS /etc/login.defs" }],
+    checks:[/sed.*PASS_MAX_DAYS.*20/,/PASS_MAX_DAYS.*20/],
+    tip:'/etc/login.defs affects new users only. Use chage -M 20 username for existing users.' },
+
+  { id:'sudo', srv:'serverb', cat:'Sudo', title:'Sudo Without Password',
+    obj:`<ul><li>Group <code>admin</code></li><li>No password required (NOPASSWD)</li><li>ملف: <code>/etc/sudoers.d/admin</code></li></ul>`,
+    hints:[{ lbl:'✏️ Create sudoers file', code:'echo "%admin ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/admin\nchmod 440 /etc/sudoers.d/admin\nvisudo -c' }],
+    checks:[/echo.*%admin.*NOPASSWD.*sudoers/,/chmod 440.*sudoers/],
+    tip:'% prefix = group in sudoers. chmod 440 is required — visudo rejects wrong permissions.' },
+
+  { id:'lvm', srv:'servera', cat:'LVM', title:'Create Logical Volume',
+    obj:`<ul><li>PE size: <code>8MiB</code></li><li>VG name: <code>datastore</code></li><li>LV name: <code>database</code> — 50 extents</li><li>Filesystem: <code>ext3</code></li><li>Mount at: <code>/mnt/database</code></li></ul>`,
+    hints:[
+      { lbl:'💾 Create PV + VG', code:'pvcreate /dev/sdc\nvgcreate -s 8MiB datastore /dev/sdc' },
+      { lbl:'📦 Create LV + format', code:'lvcreate -l 50 -n database datastore\nmkfs.ext3 /dev/datastore/database' },
+      { lbl:'🔗 Mount + fstab', code:"mkdir -p /mnt/database\necho '/dev/datastore/database /mnt/database ext3 defaults 0 0' >> /etc/fstab\nmount -a" },
+    ],
+    checks:[/pvcreate/,/vgcreate.*8MiB/,/lvcreate.*50.*database/,/mkfs\.ext3/,/fstab/],
+    tip:'Order: pvcreate → vgcreate (-s 8MiB) → lvcreate (-l 50 extents) → mkfs.ext3 → fstab → mount -a' },
+
+  { id:'lvr', srv:'servera', cat:'LVM', title:'Resize Logical Volume',
+    obj:`<ul><li>Extend <code>database</code> إلى <code>100 extents</code></li><li>Resize the filesystem too</li></ul>`,
+    hints:[
+      { lbl:'📏 Extend LV', code:'lvextend -l 100 /dev/datastore/database' },
+      { lbl:'💾 Resize filesystem', code:'umount /mnt/database\nresize2fs /dev/datastore/database\nmount -a\ndf -h /mnt/database' },
+    ],
+    checks:[/lvextend.*100/,/resize2fs/],
+    tip:'ext3: umount → resize2fs → mount. XFS: use xfs_growfs (no umount needed).' },
+
+  { id:'tuned', srv:'servera', cat:'Tuned', title:'Set Tuned Profile',
+    obj:`<ul><li>Install and enable <code>tuned</code></li><li>Get and apply the recommended profile</li></ul>`,
+    hints:[
+      { lbl:'📦 Install + enable', code:'dnf install -y tuned\nsystemctl enable --now tuned' },
+      { lbl:'🎯 Recommend + apply', code:'tuned-adm recommend\ntuned-adm profile virtual-guest\ntuned-adm active' },
+    ],
+    checks:[/systemctl.*tuned/,/tuned-adm recommend/,/tuned-adm profile/],
+    tip:'tuned-adm recommend يقترح أفضل profile للجهاز. tuned-adm active للverify.' },
+];
+
+/* ════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════ */
+let cur = 0;
+const done = {};
+T.forEach(t => done[t.id] = false);
+let hist = [], hidx = -1;
+let buf = '';
+
+// Filesystem state
+const fs = {
+  '/etc/yum.repos.d/rhel9.repo': null,
+  '/etc/auto.master': '',
+  '/etc/auto.localhome': '',
+  '/etc/chrony.conf': '# pool 2.pool.ntp.org iburst\n',
+  '/etc/login.defs': 'PASS_MAX_DAYS\t99999\nPASS_MIN_DAYS\t0\nPASS_WARN_AGE\t7\n',
+  '/etc/httpd/conf/httpd.conf': 'ServerRoot "/etc/httpd"\nListen 80\n',
+  '/etc/sudoers.d/': {},
+  '/root/search.txt': null,
+  '/common/admin/': null,
+  '/root/find.user/': null,
+  '/root/test.tar.gz': null,
+  '/home/natasha/.bashrc': '# .bashrc\n',
+};
+const users = { root:true, harry:false, natasha:false, sarah:false, alies:false };
+const groups = { root:true };
+let selinuxPorts = new Set([80, 443, 8080]);
+let firewallPorts = new Set([22, 80, 443]);
+let hostname = 'rhcsa-lab';
+
+/* ════════════════════════════════════════════
+   LAUNCH
+════════════════════════════════════════════ */
+function launch() {
+  document.getElementById('splash').classList.add('out');
+  setTimeout(() => {
+    document.getElementById('splash').style.display = 'none';
+    const app = document.getElementById('app');
+    app.classList.add('show');
+    buildTabs();
+    loadTask(0);
+    out('sys', '╔══════════════════════════════════════════════════╗');
+    out('sys', '║   ⚡  RHCSA Lab Terminal — RHEL 9 Simulated          ║');
+    out('sys', '╚══════════════════════════════════════════════════╝');
+    out('', '');
+    out('dim', '  Type commands below  |  hint = open next hint  |  help = show help');
+    out('dim', '  Click any code block in the left panel to paste it here');
+    out('', '');
+    document.getElementById('tinput').focus();
+  }, 500);
+}
+
+/* ════════════════════════════════════════════
+   TABS
+════════════════════════════════════════════ */
+function buildTabs() {
+  const sc = document.getElementById('tasks-scroll');
+  sc.innerHTML = '';
+  T.forEach((t, i) => {
+    const b = document.createElement('button');
+    b.className = 'tb' + (i===0?' active':'') + (done[t.id]?' done':'');
+    b.id = `tb-${t.id}`;
+    b.innerHTML = `${done[t.id]?'✅':'⬜'} ${t.title}`;
+    b.onclick = () => loadTask(i);
+    sc.appendChild(b);
+  });
+}
+function refreshTab(id) {
+  const b = document.getElementById(`tb-${id}`);
+  if (!b) return;
+  const t = T.find(x=>x.id===id);
+  b.className = 'tb' + (T[cur].id===id?' active':'') + (done[id]?' done':'');
+  b.innerHTML = `${done[id]?'✅':'⬜'} ${t.title}`;
+}
+function refreshProgress() {
+  const n = T.filter(t=>done[t.id]).length;
+  const p = Math.round(n/T.length*100);
+  document.getElementById('pill-fill').style.width = p+'%';
+  document.getElementById('pill-txt').textContent = `${n}/${T.length}`;
+}
+
+/* ════════════════════════════════════════════
+   LOAD TASK
+════════════════════════════════════════════ */
+function loadTask(i) {
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
+  const nb = document.getElementById(`tb-${T[i].id}`);
+  if (nb) nb.classList.add('active');
+  cur = i;
+  const t = T[i];
+  document.getElementById('tp-num').textContent = `Task ${i+1} / ${T.length}`;
+  document.getElementById('tp-title').textContent = t.title;
+  document.getElementById('tp-cat').textContent = t.cat;
+  document.getElementById('tp-srv').textContent = t.srv;
+  document.getElementById('tp-obj').innerHTML = t.obj;
+  document.getElementById('term-lbl').textContent = `bash — ${t.srv}.lab.example.com`;
+  document.getElementById('pstr').textContent = `[root@${t.srv} ~]#`;
+
+  // Hints
+  const hw = document.getElementById('hints-wrap');
+  hw.innerHTML = '';
+  t.hints.forEach((h, hi) => {
+    const d = document.createElement('div');
+    d.className = 'hint';
+    const cid = `hc-${i}-${hi}`;
+    d.innerHTML = `
+      <button class="hint-hd" onclick="togHint(this)">
+        <span>${h.lbl}</span><span style="font-size:.7rem">▸</span>
+      </button>
+      <div class="hint-bd">
+        <div class="hint-code" id="${cid}" onclick="pasteCode('${cid}')">${h.code}</div>
+      </div>`;
+    hw.appendChild(d);
+  });
+
+  // Success box
+  const sb = document.getElementById('suc-box');
+  if (done[t.id]) { sb.classList.add('show'); document.getElementById('suc-msg').textContent = t.tip; }
+  else sb.classList.remove('show');
+
+  const bn = document.getElementById('btn-next');
+  if (i < T.length-1) { bn.style.display=''; bn.textContent=`التالي: ${T[i+1].title} →`; }
+  else bn.style.display='none';
+
+  // Print task banner in terminal
+  out('', '');
+  out('sys', `━━━ Task ${i+1}/${T.length}: ${t.title} [${t.srv}] ━━━`);
+  out('dim', '  See the objective and hints in the left panel.');
+  out('', '');
+}
+
+function togHint(btn) {
+  const bd = btn.nextElementSibling;
+  const open = bd.classList.toggle('open');
+  btn.querySelector('span:last-child').textContent = open ? '▾' : '▸';
+}
+
+function pasteCode(cid) {
+  const el = document.getElementById(cid);
+  if (!el) return;
+  const firstLine = el.textContent.split('\n')[0];
+  const inp = document.getElementById('tinput');
+  inp.value = firstLine;
+  inp.focus();
+  out('dim', `  ⎘ Pasted: ${firstLine}`);
+}
+
+function nextTask() {
+  if (cur < T.length-1) loadTask(cur+1);
+}
+
+/* ════════════════════════════════════════════
+   TERMINAL OUTPUT
+════════════════════════════════════════════ */
+function out(cls, text) {
+  const div = document.createElement('div');
+  div.className = `line ${cls}`;
+  div.textContent = text;
+  const t = document.getElementById('tout');
+  t.appendChild(div);
+  t.scrollTop = t.scrollHeight;
+}
+
+/* ════════════════════════════════════════════
+   KEY HANDLER
+════════════════════════════════════════════ */
+function onKey(e) {
+  const inp = document.getElementById('tinput');
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (hidx < hist.length-1) { hidx++; inp.value = hist[hist.length-1-hidx]; }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    hidx > 0 ? (hidx--, inp.value = hist[hist.length-1-hidx]) : (hidx=-1, inp.value='');
+    return;
+  }
+  if (e.key !== 'Enter') return;
+  const raw = inp.value.trim();
+  inp.value = ''; hidx = -1;
+  if (!raw) return;
+  hist.push(raw);
+  buf += ' ' + raw;
+  if (buf.length > 3000) buf = buf.slice(-3000);
+
+  const t = T[cur];
+  out('prompt', `[root@${t.srv} ~]# ${raw}`);
+  runCmd(raw, t);
+  checkCompletion(t);
+}
+
+/* ════════════════════════════════════════════
+   COMMAND SIMULATOR
+════════════════════════════════════════════ */
+function runCmd(raw, task) {
+  const c = raw.trim();
+  const lc = c.toLowerCase();
+
+  // ── built-ins ──
+  if (c === 'clear') { document.getElementById('tout').innerHTML = ''; return; }
+  if (c === 'help') {
+    out('sys', '  Available commands:');
+    out('dim', '  hint          — open the next hint in the panel');
+    out('dim', '  clear         — clear the screen');
+    out('dim', '  ls / pwd / id — basic commands');
+    out('dim', '  ↑ ↓ arrows    — command history');
+    return;
+  }
+  if (c === 'hint') {
+    const hds = document.querySelectorAll('.hint-hd');
+    let opened = false;
+    for (const hd of hds) {
+      const bd = hd.nextElementSibling;
+      if (!bd.classList.contains('open')) { bd.classList.add('open'); hd.querySelector('span:last-child').textContent='▾'; opened=true; break; }
+    }
+    out('warn', opened ? '  💡 Next hint opened in the left panel.' : '  All hints are already open.');
+    return;
+  }
+
+  // ── common unix ──
+  if (c === 'pwd')      { out('cmd', '/root'); return; }
+  if (c === 'whoami')   { out('cmd', 'root'); return; }
+  if (c === 'id')       { out('cmd', 'uid=0(root) gid=0(root) groups=0(root) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023'); return; }
+  if (c === 'hostname') { out('cmd', hostname); return; }
+  if (c === 'getenforce') { out('cmd', 'Enforcing'); return; }
+  if (c === 'uptime')   { out('cmd', ' 10:45:12 up 1:30,  1 user,  load average: 0.00, 0.01, 0.05'); return; }
+  if (lc === 'uname -a') { out('cmd', 'Linux rhcsa-lab 5.14.0-362.8.1.el9_3.x86_64 #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux'); return; }
+  if (c === 'cat /etc/os-release') { out('cmd', 'NAME="Red Hat Enterprise Linux"\nVERSION="9.0 (Plow)"\nID="rhel"\nVERSION_ID="9.0"'); return; }
+  if (c.startsWith('ls')) { simulateLS(c); return; }
+  if (c === 'history') { hist.slice(-10).forEach((x,i)=>out('dim',`  ${i+1}  ${x}`)); return; }
+  if (c === 'df -h' || c === 'df -h /mnt/database') { out('cmd', 'Filesystem                         Size  Used Avail Use% Mounted on\n/dev/mapper/datastore-database     392M   28K  363M   1% /mnt/database'); return; }
+  if (c === 'free -h') { out('cmd', '               total        used        free\nMem:           3.6Gi       1.1Gi       2.5Gi\nSwap:          2.0Gi          0B       2.0Gi'); return; }
+
+  // ── networking ──
+  if (c === 'nmcli con show' || c === 'nmcli connection show') {
+    out('cmd', 'NAME         UUID                                  TYPE      DEVICE\nSystem eth0  abcd-1234-5678-efgh-1234  ethernet  eth0'); return;
+  }
+  if (c.startsWith('nmcli con mod') || c.startsWith('nmcli connection modify')) {
+    if (c.includes('172.25.250')) { out('ok', '✓ Connection properties saved successfully.'); }
+    else out('ok', '✓ Connection modified.');
+    return;
+  }
+  if (c.startsWith('nmcli con up') || c.startsWith('nmcli connection up')) { out('ok', '✓ Connection "System eth0" successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)'); return; }
+  if (c.startsWith('hostnamectl set-hostname')) {
+    const hn = c.split(' ')[2]; hostname = hn || hostname;
+    out('ok', `✓ Hostname set to: ${hn}`);
+    document.getElementById('pstr').textContent = `[root@${hn.split('.')[0]} ~]#`;
+    return;
+  }
+  if (c === 'hostnamectl status' || c === 'hostnamectl') { out('cmd', `   Static hostname: ${hostname}\n   Operating System: Red Hat Enterprise Linux 9.0 (Plow)\n            Kernel: Linux 5.14.0-362.8.1.el9_3.x86_64`); return; }
+
+  // ── dnf ──
+  if (c.startsWith('dnf install') || c.startsWith('yum install')) {
+    const pkgs = c.split(' ').slice(2).filter(x=>x!=='-y');
+    out('cmd', 'Last metadata expiration check: 0:02:11 ago.');
+    out('cmd', 'Dependencies resolved.');
+    pkgs.forEach(p => out('file', `  Installing: ${p}`));
+    setTimeout(()=>{
+      out('ok', `✓ Complete! Installed: ${pkgs.join(', ')}`);
+    }, 300);
+    return;
+  }
+  if (c === 'dnf repolist' || c === 'yum repolist') {
+    if (fs['/etc/yum.repos.d/rhel9.repo']) {
+      out('ok', 'repo id          repo name\nAppStream        Red Hat Enterprise Linux 9 - AppStream\nBaseOS           Red Hat Enterprise Linux 9 - BaseOS');
+    } else {
+      out('err', 'Error: There are no enabled repositories in "/etc/yum.repos.d".');
+    }
+    return;
+  }
+
+  // ── cat / heredoc ──
+  if (c.startsWith('cat >') || c.startsWith('cat>>')) {
+    const pathMatch = c.match(/cat\s*>{1,2}\s*(\S+)/);
+    const path = pathMatch ? pathMatch[1] : null;
+    if (path) {
+      if (c.includes('rhel9.repo') || c.includes('yum.repos.d')) {
+        fs['/etc/yum.repos.d/rhel9.repo'] = '...content...';
+        out('ok', `✓ Wrote: ${path}`);
+      } else if (c.includes('auto.localhome')) {
+        fs['/etc/auto.localhome'] = c;
+        out('ok', `✓ Wrote: ${path}`);
+      } else {
+        out('ok', `✓ Wrote: ${path}`);
+      }
+    }
+    return;
+  }
+  if (c.startsWith('echo') && c.includes('>>')) {
+    const target = c.split('>>')[1]?.trim();
+    if (target?.includes('chrony.conf') && c.includes('classroom.example.com')) {
+      out('ok', `✓ Added NTP server to /etc/chrony.conf`);
+    } else if (target?.includes('auto.master')) {
+      fs['/etc/auto.master'] += c;
+      out('ok', `✓ Updated /etc/auto.master`);
+    } else if (target?.includes('fstab')) {
+      out('ok', `✓ Updated /etc/fstab`);
+    } else if (target?.includes('.bashrc') && c.includes('umask')) {
+      out('ok', `✓ Updated ${target} with umask setting`);
+    } else {
+      out('ok', `✓ Appended to ${target || 'file'}`);
+    }
+    return;
+  }
+  if (c.startsWith('echo') && c.includes('>') && !c.includes('>>')) {
+    const target = c.split('>')[1]?.trim().split(' ')[0];
+    if (target?.includes('sudoers')) { out('ok', `✓ Wrote sudoers file: ${target}`); }
+    else if (target?.includes('auto.localhome')) { out('ok', `✓ Wrote /etc/auto.localhome`); }
+    else { out('ok', `✓ Wrote: ${target || 'file'}`); }
+    return;
+  }
+
+  // ── grep ──
+  if (c.startsWith('grep')) {
+    if (c.includes('/etc/passwd') && c.includes('home')) {
+      out('cmd', 'harry:x:1001:1001::/home/harry:/bin/bash\nnatasha:x:1002:1002::/home/natasha:/bin/bash\nstudent:x:1003:1003::/home/student:/bin/bash');
+      if (c.includes('search.txt')) fs['/root/search.txt'] = 'done';
+    } else if (c.includes('PASS_MAX_DAYS') && c.includes('login.defs')) {
+      out('cmd', 'PASS_MAX_DAYS   20');
+    } else if (c.includes('umask') && c.includes('.bashrc')) {
+      out('cmd', 'umask 0266');
+    } else {
+      out('cmd', '(no output)');
+    }
+    return;
+  }
+
+  // ── sed ──
+  if (c.startsWith('sed')) {
+    if (c.includes('PASS_MAX_DAYS') && c.includes('20') && c.includes('login.defs')) {
+      out('ok', `✓ /etc/login.defs updated: PASS_MAX_DAYS = 20`);
+    } else if (c.includes('Listen') && c.includes('82') && c.includes('httpd.conf')) {
+      out('ok', '✓ httpd.conf updated: Listen 82');
+    } else {
+      out('ok', '✓ File updated.');
+    }
+    return;
+  }
+
+  // ── cat (read) ──
+  if (c.startsWith('cat ') && !c.includes('>')) {
+    const f = c.split(' ')[1];
+    if (f === '/etc/passwd') out('cmd', 'root:x:0:0:root:/root:/bin/bash\nharry:x:1001:1001::/home/harry:/bin/bash\nnatasha:x:1002:1002::/home/natasha:/bin/bash\nsarah:x:1003:1003::/home/sarah:/sbin/nologin');
+    else if (f === '/etc/login.defs') out('cmd', 'PASS_MAX_DAYS   20\nPASS_MIN_DAYS   0\nPASS_WARN_AGE   7');
+    else if (f === '/etc/auto.master') out('cmd', fs['/etc/auto.master'] || '# auto.master');
+    else if (f === '/root/search.txt') out('cmd', fs['/root/search.txt'] ? 'harry:x:1001:1001::/home/harry:/bin/bash\nnatasha:x:1002:1002::/home/natasha:/bin/bash' : 'cat: /root/search.txt: No such file or directory');
+    else out('err', `cat: ${f}: No such file or directory`);
+    return;
+  }
+
+  // ── selinux ──
+  if (c === 'setenforce 0') { out('warn', '⚠️  WARNING: Disabling SELinux is forbidden in RHCSA exam!\n   Use semanage to allow ports/contexts instead.'); return; }
+  if (c === 'getenforce') { out('cmd', 'Enforcing'); return; }
+  if (c.startsWith('semanage port')) {
+    const port = c.match(/\d{2,5}/)?.[0];
+    if (c.includes('-a') && port) { selinuxPorts.add(parseInt(port)); out('ok', `✓ SELinux: port ${port} added to http_port_t\n✓ Policy saved.`); }
+    else if (c.includes('-l')) { out('cmd', `http_port_t    tcp    80, 81, ${[...selinuxPorts].join(', ')}, 443, 8080\nssh_port_t     tcp    22`); }
+    return;
+  }
+  if (c.startsWith('semanage fcontext')) { out('ok', '✓ File context policy added.'); return; }
+  if (c.startsWith('restorecon')) { out('ok', `✓ Relabeling ${c.split(' ').pop()}...\n✓ SELinux context restored.`); return; }
+
+  // ── firewall ──
+  if (c.startsWith('firewall-cmd')) {
+    const port = c.match(/\d+\/tcp/)?.[0];
+    if (c.includes('--permanent') && port) { firewallPorts.add(port); out('ok', 'success'); }
+    else if (c.includes('--reload')) out('ok', 'success');
+    else if (c.includes('--list')) out('cmd', `ports: 22/tcp 80/tcp ${[...firewallPorts].join(' ')}`);
+    else out('ok', 'success');
+    return;
+  }
+
+  // ── systemctl ──
+  if (c.startsWith('systemctl')) {
+    const [, action, svc] = c.split(' ');
+    if (action === 'daemon-reload') { out('ok', '✓ Daemon reloaded.'); return; }
+    if (action === 'enable' || action === 'start' || action === 'enable --now'.split(' ')[0]) {
+      out('ok', `✓ Created symlink /etc/systemd/system/multi-user.target.wants/${svc}.service\n✓ ${svc}.service started.`);
+    } else if (action === 'status') {
+      out('ok', `● ${svc}.service\n   Loaded: loaded (/usr/lib/systemd/system/${svc}.service)\n   Active: active (running) since ${new Date().toLocaleString()}`);
+    } else if (action === 'disable' || action === 'stop') {
+      out('ok', `✓ ${svc}.service stopped/disabled.`);
+    } else out('ok', `✓ systemctl ${action} ${svc||''}`);
+    return;
+  }
+
+  // ── user/group mgmt ──
+  if (c.startsWith('groupadd')) { const g=c.split(' ')[1]; groups[g]=true; out('ok',`✓ Group '${g}' created.`); return; }
+  if (c.startsWith('useradd')) {
+    const parts=c.split(' '); const u=parts[parts.length-1];
+    users[u]=true;
+    out('ok', `✓ User '${u}' created.`);
+    return;
+  }
+  if (c.startsWith('usermod')) { out('ok', '✓ User modified.'); return; }
+  if (c.startsWith('passwd') || c.startsWith("echo") && c.includes('passwd')) { out('ok', '✓ Password updated.'); return; }
+  if (c.startsWith('id ')) { const u=c.split(' ')[1]; out('cmd', users[u]?`uid=1001(${u}) gid=1001(${u}) groups=1001(${u}),1002(admin)`:`id: '${u}': no such user`); return; }
+  if (c === 'getent passwd harry' || c.includes('cat /etc/passwd')) { out('cmd', 'harry:x:1001:1001::/home/harry:/bin/bash'); return; }
+
+  // ── mkdir ──
+  if (c.startsWith('mkdir')) { const p=c.split(' ').pop(); out('ok',`✓ Directory created: ${p}`); return; }
+
+  // ── chgrp / chown / chmod ──
+  if (c.startsWith('chgrp')) { out('ok', `✓ Group ownership changed.`); return; }
+  if (c.startsWith('chown')) { out('ok', `✓ Ownership changed.`); return; }
+  if (c.startsWith('chmod')) { out('ok', `✓ Permissions set: ${c.split(' ')[1]}`); return; }
+
+  // ── find ──
+  if (c.startsWith('find')) {
+    if (c.includes('-user sarah')) {
+      out('cmd', '/home/sarah/file1.txt\n/home/sarah/document.txt\n/tmp/sarah_temp.txt');
+      if (c.includes('cp') && c.includes('find.user')) out('ok', '✓ Files copied to /root/find.user/');
+    } else {
+      out('cmd', '(results would appear here)');
+    }
+    return;
+  }
+
+  // ── tar ──
+  if (c.startsWith('tar')) {
+    if (c.includes('-czf') && c.includes('test.tar.gz') && c.includes('/var/tmp')) {
+      out('ok', '✓ Created: /root/test.tar.gz');
+    } else if (c.includes('-tzf')) {
+      out('cmd', 'var/tmp/\nvar/tmp/testfiles/\nvar/tmp/testfiles/sample.txt');
+    } else out('ok', '✓ tar completed.');
+    return;
+  }
+
+  // ── chronyc ──
+  if (c.startsWith('chronyc')) {
+    if (c.includes('sources')) out('ok', '210 Number of sources = 1\n\nMS Name/IP address         Stratum Poll Reach LastRx Last sample\n===============================================================================\n^* classroom.example.com        3  10   377   17m  +1234us[+1234us] +/-   20ms');
+    else out('cmd', 'chronyc — chrony control');
+    return;
+  }
+
+  // ── crontab ──
+  if (c.startsWith('crontab')) {
+    if (c.includes('-e')) { out('warn', '  [simulated: افتح محرر النصوص]\n  أضف السطر: 30 12 * * * /bin/echo "hello"\n  احفظ وأغلق'); }
+    else if (c.includes('-l')) { out('cmd', '30 12 * * * /bin/echo "hello"'); }
+    return;
+  }
+
+  // ── LVM ──
+  if (c.startsWith('pvcreate')) { out('ok', `  Physical volume "${c.split(' ')[1]}" successfully created.`); return; }
+  if (c.startsWith('vgcreate')) { out('ok', `  Volume group "datastore" successfully created.\n  PE Size: ${c.match(/\d+MiB/)?.[0]||'4MiB'}`); return; }
+  if (c.startsWith('lvcreate')) { out('ok', `  Logical volume "database" created.`); return; }
+  if (c.startsWith('lvextend')) { out('ok', `  Size of logical volume extended. Logical volume resized successfully.`); return; }
+  if (c.startsWith('mkfs.ext3') || c.startsWith('mkfs.ext4') || c.startsWith('mkfs.xfs')) { out('ok', `✓ Filesystem created on ${c.split(' ')[1]}`); return; }
+  if (c.startsWith('resize2fs')) { out('ok', `✓ Filesystem resized. New size: 800 MiB.`); return; }
+  if (c.startsWith('xfs_growfs')) { out('ok', `✓ XFS filesystem grown successfully.`); return; }
+  if (c === 'mount -a') { out('ok', '✓ All filesystems mounted.'); return; }
+  if (c.startsWith('vgdisplay')) { out('cmd', '--- Volume group ---\nVG Name               datastore\nPE Size               8.00 MiB\nAlloc PE / Size       50 / 400.00 MiB\nFree  PE / Size       77 / 616.00 MiB'); return; }
+  if (c.startsWith('lvdisplay')) { out('cmd', '--- Logical volume ---\nLV Path                /dev/datastore/database\nLV Size                400.00 MiB'); return; }
+
+  // ── tuned ──
+  if (c.startsWith('tuned-adm')) {
+    if (c.includes('recommend')) out('cmd', 'virtual-guest');
+    else if (c.includes('profile')) out('ok', `✓ Switching to profile '${c.split(' ').pop()}'\n✓ Profile applied successfully.`);
+    else if (c.includes('active')) out('ok', 'Current active profile: virtual-guest');
+    else if (c.includes('list')) out('cmd', 'Available profiles:\n- balanced\n- throughput-performance\n- virtual-guest (recommended)\n- latency-performance');
+    return;
+  }
+
+  // ── podman ──
+  if (c.startsWith('podman')) {
+    if (c.includes('login')) out('ok', 'Login Succeeded!');
+    else if (c.includes('build')) { out('cmd', 'STEP 1/4: FROM ubi9:latest\nSTEP 2/4: RUN dnf install -y ...'); setTimeout(()=>out('ok', '✓ Successfully built: localhost/monitor:latest'), 400); }
+    else if (c.includes('run') && c.includes('ascii2pdf')) out('ok', '✓ Container "ascii2pdf" started.\na1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6');
+    else if (c.includes('generate systemd')) { out('ok', '✓ /root/.config/systemd/user/container-ascii2pdf.service'); }
+    else if (c.includes('images')) out('cmd', 'REPOSITORY              TAG       IMAGE ID       CREATED         SIZE\nlocalhost/monitor       latest    a1b2c3d4e5f6   2 minutes ago   215 MB');
+    else if (c.includes('ps')) out('cmd', 'CONTAINER ID  IMAGE            COMMAND   CREATED       STATUS       NAMES\nabc123def456  localhost/monitor  /run.sh  1 min ago     Up 1 min     ascii2pdf');
+    else out('ok', '✓ podman command executed.');
+    return;
+  }
+
+  // ── loginctl ──
+  if (c.startsWith('loginctl')) { out('ok', `✓ Linger enabled for ${c.split(' ').pop()}`); return; }
+
+  // ── sudoers ──
+  if (c === 'visudo -c') { out('ok', '/etc/sudoers: parsed OK\n/etc/sudoers.d/admin: parsed OK'); return; }
+
+  // ── umask ──
+  if (c === 'umask') { out('cmd', '0266'); return; }
+
+  // ── misc ──
+  if (c.startsWith('ssh ')) { out('err', 'ssh: connect to host: Connection refused\n(SSH is disabled in this simulation)'); return; }
+  if (c === 'reboot') { out('warn', '⚠  Reboot is not available here. In the real exam, verify persistence after reboot.'); return; }
+
+  // ── unknown ──
+  out('dim', `  [simulated] Command accepted. Check hints if results are not as expected.`);
+}
+
+/* ════════════════════════════════════════════
+   CHECK COMPLETION
+════════════════════════════════════════════ */
+function checkCompletion(task) {
+  if (done[task.id]) return;
+  const satisfied = task.checks.every(re => re.test(buf));
+  if (!satisfied) return;
+  done[task.id] = true;
+
+  out('', '');
+  out('ok', '╔══════════════════════════════════════════╗');
+  out('ok', '║  ✅  ممتاز! المهمة مكتملة!               ║');
+  out('ok', `║  💡  ${task.tip.slice(0,40)}...  ║`);
+  out('ok', '╚══════════════════════════════════════════╝');
+  out('', '');
+
+  document.getElementById('suc-box').classList.add('show');
+  document.getElementById('suc-msg').textContent = task.tip;
+  refreshTab(task.id);
+  refreshProgress();
+}
+
+/* ════════════════════════════════════════════
+   LS SIMULATION
+════════════════════════════════════════════ */
+function simulateLS(c) {
+  const path = c.split(' ').filter(x=>!x.startsWith('-')).slice(1)[0] || '.';
+  const mock = {
+    '/etc/yum.repos.d': '-rw-r--r-- 1 root root  212 Jan  1 10:00 rhel9.repo',
+    '/var/www/html':    '-rw-r--r-- 1 root root   42 Jan  1 10:00 index.html\n-rw-r--r-- 1 root root   15 Jan  1 10:00 test.html',
+    '/root':            'drwxr-xr-x  2 root root  4096 Jan  1 10:00 find.user\n-rw-r--r--  1 root root  1024 Jan  1 10:00 test.tar.gz\n-rw-r--r--  1 root root   145 Jan  1 10:00 search.txt',
+    '/common':          'd---------- 2 root admin 4096 Jan  1 10:00 admin',
+    '/opt':             'drwxr-xr-x 2 root root 4096 Jan  1 10:00 files\ndrwxr-xr-x 2 root root 4096 Jan  1 10:00 processed',
+    '/home':            'drwx------ 4 harry   harry   4096 Jan  1 10:00 harry\ndrwx------ 4 natasha natasha 4096 Jan  1 10:00 natasha\ndrwx------ 4 sarah   sarah   4096 Jan  1 10:00 sarah',
+  };
+  out('file', mock[path] || `total 0\n(contents of ${path})`);
+}
+</script>
+</body>
+</html>
